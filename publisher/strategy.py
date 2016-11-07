@@ -9,7 +9,7 @@ class EventPublishStrategy(object):
     """
     strategy class for publishing events
     """
-    def __init__(self, request_id, strategy, message, **kwargs):
+    def __init__(self, strategy, request_id, message, **kwargs):
         """
         initialize publisher class with strategy
 
@@ -20,7 +20,6 @@ class EventPublishStrategy(object):
         self.strategy = strategy
         self.request_id = strategy
         self.message = message
-        self.channel = kwargs.get("channel", None)
 
     def before_processing(
             self, validations=None,
@@ -41,7 +40,7 @@ class EventPublishStrategy(object):
                 try:
                     return _method(self)
                 except Exception as exc:
-                    on_exception(self, exabbitMQBackendUS.REJ)
+                    on_exception(self, status=STATUC.REJ, exc=exc)
             return wrap
 
         for validation in validations:
@@ -50,8 +49,8 @@ class EventPublishStrategy(object):
         return self
 
     def while_processing_do(
-            self, on_exception=lambda self, exc: None,
-            when_done=lambda obj, msg: None):
+            self, on_exception=lambda self, status, exc: None,
+            when_done=lambda obj, status, exc: None):
         """
         bind methods calls with multiple actions
         """
@@ -65,9 +64,9 @@ class EventPublishStrategy(object):
             try:
                 message = _klass.publish()
             except Exception as exc:
-                on_exception(self, exc)
+                on_exception(self, exc, status=STATUC.FAIL)
             else:
-                when_done(self, message)
+                when_done(self, STATUS.QUE)
             return message
 
         self.trigger = _wrapper

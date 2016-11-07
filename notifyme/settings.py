@@ -26,7 +26,7 @@ SECRET_KEY = '4!bo9f-$5xoh2b$^-3p!q#x-q9v7!+!(ng5@7hq-dg$hqzizh7'
 DEBUG = True
 
 ALLOWED_HOSTS = []
-
+PROJECT_NAME = "notifier"
 
 # Application definition
 
@@ -143,3 +143,43 @@ ENV = "local"
 CLOUDAMQP_URL = "amqp://tcjndljr:ZbkZ3VFU2Kw3B2uoPfiuxbMQPIyJL32-@jellyfish.rmq.cloudamqp.com/tcjndljr"
 SOCKET_TIMEOUT = 30
 PUBLISH_QUEUE = "notifyme-{env}"
+
+
+
+########################## Logging configuration ######################
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'file_format': {
+            'format': (
+                '@level %(levelname)s|@timestamp %(asctime)s|'
+                '@module %(name)s|@message %(message)s'
+            )
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.getenv(
+                'LOGDIR', "/app/logs") + "/%s.log" % PROJECT_NAME.lower(),
+            'formatter': 'file_format',
+            'maxBytes': 1024 * 1024 * 100,
+            'backupCount': 10,
+        },
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'file_format'
+        },
+    },
+    'loggers': {
+        '': {
+            'handlers': ['file', 'console'],
+            'level': "INFO",
+            'propogate': True,
+        }
+    }
+}
+#######################################################################

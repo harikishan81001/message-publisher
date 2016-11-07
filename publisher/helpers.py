@@ -1,19 +1,24 @@
-from publisher.models import Channel
+import logging
+
+from publisher.models import Template
 from publisher.exceptions import InvalidMessage
 from publisher.utils import get_default_message_format
 
 
-class ValidateChannel(object):
+logger = logging.getLogger(__name__)
+
+
+class ValidateTemplate(object):
     """
-    Channel Validator
+    Template Validator
     """
     def validate(self, adapter):
-        if not adapter.channel:
-            raise Channel.DoesNotExist(
-                "Sorry, No channel identity number provided!"
+        if not adapter.template:
+            raise Template.DoesNotExist(
+                "Sorry, No template identity number provided!"
             )
-        channel = Channel.objects.get_channel(adapter.channel)
-        adapter.channel = channel
+        channel = Template.objects.get_channel(adapter.template)
+        adapter.template = template
 
 
 class ValidateMessage(object):
@@ -43,3 +48,19 @@ class ValidateMessage(object):
                     message.update(**{key:default})
         if errors:
             raise InvalidMessage(",".join(errors))
+
+
+def log_message(publisher, status=STATUS.FAIL, exc=None):
+    """
+    logs event in logging system with details
+    """
+    if exc:
+        message = (
+            "%s to process event"
+            " exception=%s, status=%s" % (
+                status, exc.__repr__(), status
+            )
+        )
+    else:
+        message = "Message sent to queue %s" % status
+    logger.info(message)
