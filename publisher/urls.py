@@ -1,15 +1,11 @@
-from django.conf.urls import patterns, include, url
+from django.conf.urls import include, url
 
 from publisher.apiviews import PublishAPI
 
 
 urlpatterns = [
     url(
-        r'publish/events/',
+        r'^api/events/$',
         PublishAPI.as_view(), name='publish_api'
     ),
-    url(
-        r'^api-auth/', include('rest_framework.urls',
-        namespace='rest_framework')
-    )
 ]

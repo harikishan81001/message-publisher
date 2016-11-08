@@ -1,7 +1,7 @@
 from collections import namedtuple
 
 statuses = namedtuple(
-    'Status', ['REJ', "QUE", 'SENT', "DLV"]
+    'Status', ['REJ', "QUE", 'SENT', "DLV", "FAIL"]
 )
 
 STATUS = statuses(
@@ -9,4 +9,5 @@ STATUS = statuses(
     QUE="Queued",
     SENT="Sent",
     DLV="Delivered",
+    FAIL='Failed',
 )

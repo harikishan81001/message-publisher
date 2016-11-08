@@ -6,16 +6,3 @@ def get_default_policy():
 
 
 EXCLUDE_KEYS = []
-
-
-def get_default_message_format():
-    """
-    Returns default message schema
-    """
-    return {
-        "dynamic_params": {"required": True,},
-        "url": {"required": True},
-        "headers": {"required": False},
-        "method": {"required": False, "default": "POST"},
-    }
-

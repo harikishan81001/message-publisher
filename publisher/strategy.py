@@ -1,6 +1,8 @@
 import copy
 import json
 
+from django.conf import settings
+
 from publisher.app_settings import STATUS
 from publisher.amqp import RabbitMQBackend
 
@@ -9,7 +11,7 @@ class EventPublishStrategy(object):
     """
     strategy class for publishing events
     """
-    def __init__(self, strategy, request_id, message, **kwargs):
+    def __init__(self, strategy, request_id, keys, template, **kwargs):
         """
         initialize publisher class with strategy
 
@@ -18,8 +20,11 @@ class EventPublishStrategy(object):
         """
         self.validations = []
         self.strategy = strategy
-        self.request_id = strategy
-        self.message = message
+        self.request_id = request_id
+        self.message = None
+        self.template = None
+        self.template_irn = template
+        self.keys = keys
 
     def before_processing(
             self, validations=None,
@@ -40,7 +45,8 @@ class EventPublishStrategy(object):
                 try:
                     return _method(self)
                 except Exception as exc:
-                    on_exception(self, status=STATUC.REJ, exc=exc)
+                    on_exception(self, status=STATUS.REJ, exc=exc)
+                    return False
             return wrap
 
         for validation in validations:
@@ -54,7 +60,7 @@ class EventPublishStrategy(object):
         """
         bind methods calls with multiple actions
         """
-        _klass = self.strategy(self.request_id)
+        _klass = self.strategy(self, self.request_id)
 
         def _wrapper():
             """
@@ -64,9 +70,9 @@ class EventPublishStrategy(object):
             try:
                 message = _klass.publish()
             except Exception as exc:
-                on_exception(self, exc, status=STATUC.FAIL)
+                on_exception(self, exc, STATUS.FAIL)
             else:
-                when_done(self, STATUS.QUE)
+                when_done(self, None, STATUS.QUE)
             return message
 
         self.trigger = _wrapper
@@ -84,10 +90,21 @@ class EventPublishStrategy(object):
             self.trigger = trigger
 
         response = self.trigger()
-
-        for _func in self.also_do_fn:
-            _func(self)
         return response
+
+    def is_valid(self):
+        """
+        actual invoking method for validations
+        """
+        is_valid = True
+        for validation in self.validations:
+            is_valid = validation(self)
+
+            # break further execution if any validation fails
+            if not is_valid:
+                break
+
+        return is_valid
 
 
 class Strategy(object):
@@ -99,19 +116,24 @@ class Strategy(object):
         self.adapter = adapter
 
     def get_payload(self):
-        payload = copy.deepcopy(self.adapter.message)
-        payload.update(request_id=request)
+        payload = dict()
+        payload.update(
+            request_id=self.request_id,
+            message=self.adapter.message,
+            url=self.adapter.template.url,
+            method=self.adapter.template.method,
+            maxretries=self.adapter.template.policy.get("maxRetries", 3),
+            headers=self.adapter.template.headers
+        )
         return payload
 
     def publish(self):
         exchange = settings.PUBLISH_EXCHANGE
-        queue = settings.PUBLISH_QUEUE.format(
-            env=settings.ENV
-        )
+        queue = settings.PUBLISH_QUEUE
         backend = RabbitMQBackend()
         backend.open()
         payload = self.get_payload()
         return backend.publish(
-            queue, body=json.dumps(body),
+            queue, body=json.dumps(payload),
             exchange=exchange
         )

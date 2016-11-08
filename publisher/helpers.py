@@ -1,9 +1,9 @@
 import logging
+import re
 
 from publisher.models import Template
 from publisher.exceptions import InvalidMessage
-from publisher.utils import get_default_message_format
-
+from publisher.app_settings import STATUS
 
 logger = logging.getLogger(__name__)
 
@@ -13,41 +13,45 @@ class ValidateTemplate(object):
     Template Validator
     """
     def validate(self, adapter):
-        if not adapter.template:
+        if not adapter.template_irn:
             raise Template.DoesNotExist(
                 "Sorry, No template identity number provided!"
             )
-        channel = Template.objects.get_channel(adapter.template)
+        template = Template.objects.get_template(adapter.template_irn)
         adapter.template = template
+        return True
 
 
 class ValidateMessage(object):
     """
     Validate message
     """
-    def validate(self, adapter):
-        default_schema = get_default_message_format()
-        if not adapter.message:
-            raise InvalidMessage(
-                "No message provided for publishing"
-            )
-        errors = list()
-        for key, conf in default_schema:
-            required, default = (
-                conf.get("required", False),
-                conf.get("default")
-            )
-            if required:
-                if not conf.get(key):
-                    errors.append(
-                        "{key} is mandatory !".format(key=key)
-                    )
+    def get_template_keys(self, template):
+        """
+        Returns all possible dynamic parameters
+        """
+        message = template.message
+        return re.findall(r"\{(\w+)\}", message)
 
-            else:
-                if not conf.get(key):
-                    message.update(**{key:default})
+    def validate(self, adapter):
+        errors = list()
+        replace_vars = {}
+        keys = self.get_template_keys(adapter.template)
+        if keys and not adapter.keys:
+            raise InvalidMessage(
+                "No keys provided for replacement on message"
+                " dynamic varidables"
+            )
+
+        for key in keys:
+            if key not in adapter.keys:
+                errors.append(key)
+                continue
+            replace_vars[key] = adapter.keys[key]
         if errors:
-            raise InvalidMessage(",".join(errors))
+            raise InvalidMessage("Keys %s are required" % ",".join(errors))
+        adapter.message = adapter.template.message.format(**replace_vars)
+        return True
 
 
 def log_message(publisher, status=STATUS.FAIL, exc=None):

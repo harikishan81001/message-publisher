@@ -142,8 +142,8 @@ CACHE_DEFAULT_EXPIRY_TIME = 1 * 24 * 60
 ENV = "local"
 CLOUDAMQP_URL = "amqp://tcjndljr:ZbkZ3VFU2Kw3B2uoPfiuxbMQPIyJL32-@jellyfish.rmq.cloudamqp.com/tcjndljr"
 SOCKET_TIMEOUT = 30
-PUBLISH_QUEUE = "notifyme-{env}"
-
+PUBLISH_QUEUE = "notifyme"
+PUBLISH_EXCHANGE = "notifications"
 
 
 ########################## Logging configuration ######################

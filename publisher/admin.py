@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from publisher.models import Channel
+from publisher.models import Template
 
 
-admin.site.register(Channel)
+admin.site.register(Template)
