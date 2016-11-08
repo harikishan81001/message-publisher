@@ -10,6 +10,7 @@ from rest_framework.response import Response
 
 from publisher.strategy import EventPublishStrategy, Strategy
 from publisher.helpers import ValidateTemplate, ValidateMessage
+from publisher.helpers import ValidateMessageStatus
 from publisher.helpers import log_message
 from publisher.app_settings import STATUS
 
@@ -45,6 +46,7 @@ class PublishAPI(APIView):
             validations=[
                 ValidateTemplate,
                 ValidateMessage,
+                ValidateMessageStatus
             ],
             on_exception=log_message
         )

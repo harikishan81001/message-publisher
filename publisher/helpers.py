@@ -2,8 +2,9 @@ import logging
 import re
 
 from publisher.models import Template
-from publisher.exceptions import InvalidMessage
+from publisher.exceptions import InvalidMessage, AlreadyPendingMessage
 from publisher.app_settings import STATUS
+from publisher.redismodels import EventsDetails
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,27 @@ class ValidateMessage(object):
         return True
 
 
+
+class ValidateMessageStatus(object):
+    """
+    Validates message status
+    """
+    def validate(self, adapter):
+        valid = False
+        template_id = adapter.template_irn
+        try:
+            event = EventsDetails.objects.filter(
+                status=STATUS.QUE, template_id=template_id
+            )[0]
+            if event:
+                raise AlreadyPendingMessage(
+                    "Sorry ! message is already pending for processing !"
+                )
+        except IndexError as e:
+            valid = True
+        return valid
+
+
 def log_message(publisher, status=STATUS.FAIL, exc=None):
     """
     logs event in logging system with details
@@ -66,5 +88,29 @@ def log_message(publisher, status=STATUS.FAIL, exc=None):
             )
         )
     else:
-        message = "Message sent to queue %s" % status
+        message = "Sent to queue status=%s" % status
     logger.info(message)
+
+
+def index_events_details(template_irn, status, req_id):
+    try:
+        evnt = EventsDetails(
+            template_id=template_irn,
+            status=status,
+            request_id=req_id
+        )
+        evnt.save()
+    except Exception as e:
+        logger.error(e)
+
+
+def update_events_details(template_irn, status):
+    try:
+        event = EventsDetails.objects.filter(
+            template_id=template_irn,
+            status=STATUS.QUE
+        )[0]
+        event.status = status
+        event.save()
+    except Exception as e:
+        logger.error(e)

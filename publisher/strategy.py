@@ -6,6 +6,8 @@ from django.conf import settings
 from publisher.app_settings import STATUS
 from publisher.amqp import RabbitMQBackend
 
+from publisher.helpers import index_events_details
+
 
 class EventPublishStrategy(object):
     """
@@ -70,9 +72,12 @@ class EventPublishStrategy(object):
             try:
                 message = _klass.publish()
             except Exception as exc:
-                on_exception(self, exc, STATUS.FAIL)
+                on_exception(self, STATUS.FAIL, exc)
             else:
-                when_done(self, None, STATUS.QUE)
+                index_events_details(
+                    self.template_irn, STATUS.QUE, self.request_id
+                )
+                when_done(self, STATUS.QUE, None)
             return message
 
         self.trigger = _wrapper
@@ -122,8 +127,9 @@ class Strategy(object):
             message=self.adapter.message,
             url=self.adapter.template.url,
             method=self.adapter.template.method,
+            headers=self.adapter.template.headers,
+            template_irn=self.adapter.template.irn,
             maxretries=self.adapter.template.policy.get("maxRetries", 3),
-            headers=self.adapter.template.headers
         )
         return payload
 

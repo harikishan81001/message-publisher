@@ -135,16 +135,20 @@ CACHES = {
     },
 }
 
+REDISCO_REDIS_HOST = "localhost"
+REDISCO_REDIS_PORT = 6379
+REDISCO_REDIS_DB = 2
+
 
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 CACHE_DEFAULT_EXPIRY_TIME = 1 * 24 * 60
 
 ENV = "local"
-CLOUDAMQP_URL = "amqp://tcjndljr:ZbkZ3VFU2Kw3B2uoPfiuxbMQPIyJL32-@jellyfish.rmq.cloudamqp.com/tcjndljr"
+CLOUDAMQP_URL = ""
 SOCKET_TIMEOUT = 30
 PUBLISH_QUEUE = "notifyme"
 PUBLISH_EXCHANGE = "notifications"
-
+REQ_TIMEOUT = 30
 
 ########################## Logging configuration ######################
 LOGGING = {
