@@ -8,3 +8,9 @@ class AlreadyPendingMessage(Exception):
     """
     Raised in case found message in Queued state
     """
+
+
+class AlreadyPublished(Exception):
+    """
+    Raised in case found message delivered
+    """

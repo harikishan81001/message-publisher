@@ -11,11 +11,52 @@ from django.core.management.base import BaseCommand
 
 from publisher.utils import get_backofftime
 from publisher.amqp import RabbitMQBackend
+from publisher.exceptions import AlreadyPublished
 from publisher.app_settings import STATUS
 from publisher.helpers import update_events_details
+from publisher.helpers import get_req_status
 
 
 logger = logging.getLogger(__name__)
+
+
+def do_retry(channel, body):
+    """
+    Logic for publishing message to Deadletter Xchange
+    where message will wait till TTL and after TTL expiration
+    message will be forwarded to actual exchange
+    """
+    retries = body.get("retries", 0)
+    grace_period = get_backofftime(retries + 1)
+    body["maxretries"] = body["maxretries"] - 1
+    body["retries"] = retries + 1
+
+    retry_exchange = "DLX-%s" % grace_period
+    retry_queue = "DLQ-%s" % grace_period
+
+    properties = {
+        "x-dead-letter-exchange": settings.CALLBACK_EXCHANGE,
+        "x-message-ttl": grace_period,
+        "x-dead-letter-routing-key": settings.CALLBACK_QUEUE
+    }
+    channel.exchange_declare(retry_exchange, "direct")
+    channel.queue_declare(
+        retry_queue,
+        passive=False,
+        durable=False,
+        arguments=properties
+    )
+    channel.queue_bind(
+        queue=retry_queue,
+        exchange=retry_exchange,
+        routing_key=retry_queue
+    )
+    channel.basic_publish(
+        exchange=retry_exchange,
+        routing_key=retry_queue,
+        body=json.dumps(body),
+        properties=pika.BasicProperties(delivery_mode=2)
+    )
 
 
 def callback(ch, method, properties, body):
@@ -38,48 +79,45 @@ def callback(ch, method, properties, body):
 
     try:
         body = json.loads(body)
-        max_retries = body["maxretries"]
-        http_method = body["method"]
-        text = body["message"]
-        url = body["url"]
-        headers = body.get("headers", dict())
-        params = body.get("params", dict())
-        callback_details = body['callback']
-        update_events_details(
-            body["request_id"], STATUS.SENT, callback_details,
-            maxRetries=max_retries
-        )
+        req_id = body['request_id']
+        req_status = get_req_status(req_id)
 
-        req = Request(http_method, url, data=text, headers=headers)
+        if req_status == STATUS.DLV:
+            raise AlreadyPublished(
+                "Message status for request id is alread delivered"
+            )
+
+        status = body['status']
+        callback_details = body['callback']
+        max_retries = body["maxretries"]
+        http_method = callback_details["method"]
+
+        url = callback_details["url"]
+        headers = callback_details.get("headers", dict())
+        params = callback_details.get("params", dict())
+        req = Request(
+            http_method, url,
+            data=json.dumps({"status": status, "request_id": req_id}),
+            headers=headers
+        )
         req = req.prepare()
-        resp = s.send(
-            req, timeout=settings.REQ_TIMEOUT, verify=False
-        )
+        resp = s.send(req, timeout=settings.REQ_TIMEOUT, verify=False)
         resp.raise_for_status()
-        update_events_details(
-            body["request_id"], STATUS.DLV, callback_details,
-            maxRetries=max_retries
-        )
     except KeyError as e:
-        update_events_details(
-            body["request_id"], STATUS.FAIL,
-            callback_details,
-            maxRetries=max_retries
-        )
         logger.error(
             "Important key %s missing,"
             " message can not be processed"
         )
+    except AlreadyPublished:
+        logger.info("No need to send message status")
     except Exception as e:
-        update_events_details(
-            body["request_id"],
-            STATUS.FAIL, callback_details,
-            maxRetries=max_retries
-        )
-        logger.exception(
-            "Sorry! message can not be processed,"
-            " MaxRetries exhausted"
-        )
+        if body["maxretries"] <= 0:
+            logger.exception(
+                "Sorry! message can not be processed,"
+                " MaxRetries exhausted"
+            )
+        else:
+            do_retry(channel, body)
     finally:
         channel.basic_ack(delivery_tag=method.delivery_tag)
 
@@ -96,8 +134,9 @@ class Command(BaseCommand):
         """
         Command handler
         """
-        exchange = settings.PUBLISH_EXCHANGE
-        queue = settings.PUBLISH_QUEUE
+        exchange = settings.CALLBACK_EXCHANGE
+        queue = settings.CALLBACK_QUEUE
+
         backend = RabbitMQBackend()
         backend.open()
         try:

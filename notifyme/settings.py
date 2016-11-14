@@ -150,6 +150,10 @@ PUBLISH_QUEUE = "notifyme"
 PUBLISH_EXCHANGE = "notifications"
 REQ_TIMEOUT = 30
 
+CALLBACK_QUEUE = "callback-exchange"
+CALLBACK_EXCHANGE = "callback-queue"
+
+
 ########################## Logging configuration ######################
 LOGGING = {
     'version': 1,

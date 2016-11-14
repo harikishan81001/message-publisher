@@ -5,6 +5,7 @@ from publisher.models import Template
 from publisher.exceptions import InvalidMessage, AlreadyPendingMessage
 from publisher.app_settings import STATUS
 from publisher.redismodels import EventsDetails
+from publisher.amqp import RabbitMQBackend
 
 logger = logging.getLogger(__name__)
 
@@ -92,25 +93,51 @@ def log_message(publisher, status=STATUS.FAIL, exc=None):
     logger.info(message)
 
 
-def index_events_details(template_irn, status, req_id):
+def index_events_details(req_id, template_irn, status):
     try:
         evnt = EventsDetails(
+            request_id=req_id
             template_id=template_irn,
             status=status,
-            request_id=req_id
         )
         evnt.save()
     except Exception as e:
         logger.error(e)
 
 
-def update_events_details(template_irn, status):
+def update_events_details(request_id, status, callback_info, maxRetries=3):
     try:
         event = EventsDetails.objects.filter(
-            template_id=template_irn,
-            status=STATUS.QUE
+            request_id=req_id
         )[0]
         event.status = status
         event.save()
+
+        exchange = settings.CALLBACK_EXCHANGE
+        queue = settings.CALLBACK_QUEUE
+        backend = RabbitMQBackend()
+        backend.open()
+        payload = {
+            "callback": callback_info,
+            "status": status,
+            "request_id": request_id,
+            "maxRetries": maxRetries
+        }
+        return backend.publish(
+            queue, body=json.dumps(payload),
+            exchange=exchange
+        )
     except Exception as e:
         logger.error(e)
+
+
+def get_req_status(req_id):
+    try:
+        event = EventsDetails.objects.filter(
+            request_id=req_id
+        )[0]
+        return event.status
+    except Exception as e:
+        logger.error(e)
+
+

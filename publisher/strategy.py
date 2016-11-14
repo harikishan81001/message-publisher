@@ -13,7 +13,7 @@ class EventPublishStrategy(object):
     """
     strategy class for publishing events
     """
-    def __init__(self, strategy, request_id, keys, template, **kwargs):
+    def __init__(self, strategy, request_id, keys, template, callback):
         """
         initialize publisher class with strategy
 
@@ -27,6 +27,7 @@ class EventPublishStrategy(object):
         self.template = None
         self.template_irn = template
         self.keys = keys
+        self.callback_info = callback
 
     def before_processing(
             self, validations=None,
@@ -75,7 +76,7 @@ class EventPublishStrategy(object):
                 on_exception(self, STATUS.FAIL, exc)
             else:
                 index_events_details(
-                    self.template_irn, STATUS.QUE, self.request_id
+                    self.request_id, self.template_irn, STATUS.QUE,
                 )
                 when_done(self, STATUS.QUE, None)
             return message
@@ -130,6 +131,7 @@ class Strategy(object):
             headers=self.adapter.template.headers,
             template_irn=self.adapter.template.irn,
             maxretries=self.adapter.template.policy.get("maxRetries", 3),
+            callback=self.adapter.callback_info
         )
         return payload
 

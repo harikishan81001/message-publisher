@@ -39,6 +39,7 @@ class PublishAPI(APIView):
             request_id,
             keys,
             request.data.get("template_irn"),
+            callback=request.data.get("callback_info", dict())
         )
 
         # before processing let's do some validations
@@ -46,7 +47,6 @@ class PublishAPI(APIView):
             validations=[
                 ValidateTemplate,
                 ValidateMessage,
-                ValidateMessageStatus
             ],
             on_exception=log_message
         )

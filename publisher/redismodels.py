@@ -16,9 +16,9 @@ class EventsDetails(models.Model):
     """
     Count against protocols
     """
+    request_id = models.Attribute(required=True, unique=True)
     template_id = models.Attribute(required=True)
     status = models.Attribute(required=True)
-    request_id = models.Attribute()
 
     @property
     def db(cls):
